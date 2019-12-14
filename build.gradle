@@ -1,9 +1,0 @@
-apply plugin: 'scala'
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    compile 'org.apache.spark:spark-core_2.12:2.4.4'
-}
