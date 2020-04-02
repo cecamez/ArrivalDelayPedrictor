@@ -7,4 +7,8 @@ Spark application that creates a machine learning model for a real-world problem
 * Program language: Scala 2.13.1
 * Java SDK: version 8
 
+### About Data Source
+* [Data source]: https://www.transtats.bts.gov/Fields.asp?Table_ID=236
+* (Optional) Filter Geography: All | Year: 2020 | Month: January
+
 Educational purpose
