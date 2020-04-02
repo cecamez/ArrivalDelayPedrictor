@@ -40,3 +40,4 @@ build.log
 #SHITTY output not in target directory
 build.log
 /spark-3.0.0-preview2-bin-hadoop2.7/
+/735926286_T_ONTIME_REPORTING.csv
