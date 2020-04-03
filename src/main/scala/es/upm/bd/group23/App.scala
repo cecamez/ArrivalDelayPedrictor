@@ -14,23 +14,36 @@ import org.apache.log4j.{Level, Logger}
  */
 object App {
   // Input file location
-  val inputFilePath = "735926286_T_ONTIME_REPORTING.csv"
+  val inputFilePath = "C:\\Users\\TRCECG\\Desktop\\ArrivalDelayPedrictor\\735926286_T_ONTIME_REPORTING.csv"
 
   def main(args : Array[String]) {
-    /*Logger.getLogger("org").setLevel(Level.WARN)
-    val conf = new SparkConf().setAppName("My first Spark application")
-    val sc = new SparkContext(conf)
-    val data = sc.textFile("file:///tmp/98.txt")
-    val numAs = data.filter(line => line.contains("a")).count()
-    val numBs = data.filter(line => line.contains("b")).count()
-    println(s"Lines with a: ${numAs}, Lines with b: ${numBs}")*/
 
     // 1. Load the input data, previously stored at a known location.
     val conf = new SparkConf().setAppName("Arrival Delay Predictor Application")
     val sc = new SparkContext(conf)
     val data = sc.textFile(inputFilePath)
-    data.foreach(println(_))
+    // data.foreach(println(_))
+    // 2. Select, process and transform the input variables, to prepare them for training the model.
+    // 2.1. Gets a RDD with a list with all columns per line.
+    val rdd = data.map(line => {line.split(",")})
+    rdd.foreach(f=>{
+      println("Col1:"+f(0)+",Col2:"+f(1))
+    })
 
+    // 2.2. Remove forbidden variables:
+    /** 2.1 Remove forbidden variables:
+     * ● ArrTime (ARR_TIME)
+     * ● ActualElapsedTime (ACTUAL_ELAPSED_TIME)
+     * ● AirTime (AIR_TIME)
+     * ● TaxiIn (TAXI_IN)
+     * ● Diverted (DIVERTED)
+     * ● CarrierDelay (CARRIER_DELAY)
+     * ● WeatherDelay (WEATHER_DELAY)
+     * ● NASDelay (NAS_DELAY)
+     * ● SecurityDelay (SECURITY_DELAY)
+     * ● LateAircraftDelay (LATE_AIRCRAFT_DELAY)
+     *
+     */
 
   }
 }
