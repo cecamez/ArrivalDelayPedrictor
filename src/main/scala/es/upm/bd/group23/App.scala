@@ -24,12 +24,12 @@ object App {
     val data = sc.textFile(inputFilePath)
     // data.foreach(println(_))
     // 2. Select, process and transform the input variables, to prepare them for training the model.
-    // 2.1. Gets a RDD with a list with all columns per line.
+    // 2.1. Gets a RDD with a list with all columns per line and skips header from csv file
     val rdd = data.map(line => {line.split(",")})
+      .mapPartitionsWithIndex { (idx, it) => if (idx == 0) it.drop(1) else it }
     rdd.foreach(f=>{
       println("Col1:"+f(0)+",Col2:"+f(1))
     })
-
     // 2.2. Remove forbidden variables:
     /** 2.1 Remove forbidden variables:
      * ● ArrTime (ARR_TIME)
