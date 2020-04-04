@@ -4,6 +4,8 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
 
 /**
  * ● Load the input data, previously stored at a known location.
@@ -19,18 +21,34 @@ object App {
   def main(args : Array[String]) {
 
     // 1. Load the input data, previously stored at a known location.
-    val conf = new SparkConf().setAppName("Arrival Delay Predictor Application")
+    /*val conf = new SparkConf().setAppName("Arrival Delay Predictor Application")
     val sc = new SparkContext(conf)
-    val data = sc.textFile(inputFilePath)
-    // data.foreach(println(_))
+    val data = sc.textFile(inputFilePath)*/
+
+    val spark = SparkSession.builder()
+      //.master("local[1]")
+      .appName("Arrival Delay Predictor Application")
+      .getOrCreate();
+
+    val df = spark.read.format("csv")
+      .option("header", "true")
+      .option("delimiter",",")
+      .load(inputFilePath)
+
+    df.show()
+
+
     // 2. Select, process and transform the input variables, to prepare them for training the model.
     // 2.1. Gets a RDD with a list with all columns per line and skips header from csv file
-    val rdd = data.map(line => {line.split(",")})
+    /*val rdd = data.map(line => {line.split(",")})
+      // 2.2 Remove forbidden variables:
       .mapPartitionsWithIndex { (idx, it) => if (idx == 0) it.drop(1) else it }
+
     rdd.foreach(f=>{
       println("Col1:"+f(0)+",Col2:"+f(1))
-    })
-    // 2.2. Remove forbidden variables:
+    })*/
+
+
     /** 2.1 Remove forbidden variables:
      * ● ArrTime (ARR_TIME)
      * ● ActualElapsedTime (ACTUAL_ELAPSED_TIME)
