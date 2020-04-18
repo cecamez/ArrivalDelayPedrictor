@@ -4,10 +4,13 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.ml.linalg.{Matrix, Vectors}
+import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.ml.stat.Correlation
 //import org.apache.spark.sql.catalyst.expressions.{Lag, Window}
 
@@ -49,7 +52,7 @@ object App {
       // 2.4 Removes no available values.
       .na.drop()
     // 2.5 Correlation matrix.
-    val inputMatrix = new VectorAssembler()
+    /*val inputMatrix = new VectorAssembler()
       .setInputCols(correlationUsefulVariables)
       .setOutputCol("features")
       .transform(df)
@@ -57,7 +60,7 @@ object App {
     println("Spearman correlation matrix :\n" + coeff.toString)
     // 2.6 Group, order and filter.
     val dfSorted = df.orderBy(df.col("YEAR").desc, df.col("MONTH").desc, df.col("DAY_OF_MONTH").desc,
-      df.col("DAY_OF_WEEK").desc).filter(df("CANCELLED") === 0)
+      df.col("DAY_OF_WEEK").desc).filter(df("CANCELLED") === 0)*/
 
     // 2.7 Creates new variables.
     //, DELAY_FACTOR, DELAY_CUMULATIVE  〖DELAY_FACTOR 〗_(n+1)  =  〖CRS_ELAPSED_TIME〗_(n+1)/〖CRS_ELAPSED_TIME〗_n
@@ -65,10 +68,46 @@ object App {
         df.col("ARR_DELAY") + df.col("CRS_ARR_TIME"))
       .withColumn("DELAY_FACTOR", Lag("DELAY_FACTOR", 1, null).over(window))*/
 
+    // 2.8 Modeling
+    // Splits the data into train and test datasets
+    val Array(train, test) = df.randomSplit(Array(.8,.2), 42)
 
-    dfSorted.write
+    val assembler = new VectorAssembler()
+      .setInputCols(correlationUsefulVariables)
+      .setOutputCol("features")
+
+    // Modeling:
+    // Instantiate the model and fit the training dataset into the model.
+    val lr = new LinearRegression()
+      .setFeaturesCol("features")
+      .setLabelCol(targetVariable)
+      .setMaxIter(10)
+      .setElasticNetParam(0.8)
+
+    /*println(s"Coefficients: ${lrModel.coefficients}")
+    println(s"Intercept: ${lrModel.intercept}")
+    val trainingSummary = lrModel.summary
+
+     println(s"numIterations: ${trainingSummary.totalIterations}")
+     //println(s"objectiveHistory: ${trainingSummary.objectiveHistory.toList}")
+     trainingSummary.residuals.show()
+     println(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
+     println(s"r2: ${trainingSummary.r2}")*/
+
+    // Then user the model on the test data to get the predictions and lastly evaluating the score
+    // of the predictions with the evaluation metric.
+
+    val pipeline = new Pipeline()
+      .setStages(Array(assembler,lr))
+    val lrModel = pipeline.fit(train)
+
+    lrModel.transform(test).show(truncate=false)
+
+    // 2.9 Evaluating
+
+    /*dfSorted.write
       .option("header","true")
-      .csv("../spark_output")
+      .csv("../spark_output")*/
 
     // 2.1. Gets a RDD with a list with all columns per line and skips header from csv file
     /*val rdd = data.map(line => {line.split(",")})
