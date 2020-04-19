@@ -5,6 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, RegressionEvaluator}
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SparkSession}
@@ -101,9 +102,23 @@ object App {
       .setStages(Array(assembler,lr))
     val lrModel = pipeline.fit(train)
 
-    lrModel.transform(test).show(truncate=false)
+    val prediction = lrModel.transform(test)
+    prediction.show(truncate=false)
 
     // 2.9 Evaluating
+    /***
+     * We can use the RegressionEvaluator to obtain the R2, MSE or RMSE. It required two columns,
+     * ARR_DELAY and prediction to evaluate the model.
+     */
+    // 2.9.1 Evaluate model with area under ROC
+    val evaluator = new RegressionEvaluator()
+      .setLabelCol(targetVariable)
+      .setPredictionCol("prediction")
+      .setMetricName("r2")
+
+    // 2.9.2 Measure the accuracy of pipeline model
+    val pipelineAccuracy = evaluator.evaluate(prediction)
+    println("The model accuracy is: " + pipelineAccuracy)
 
     /*dfSorted.write
       .option("header","true")
