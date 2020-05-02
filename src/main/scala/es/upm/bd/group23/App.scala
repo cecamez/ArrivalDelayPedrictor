@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, RegressionEvaluator}
-import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.ml.linalg.{Matrix, Vectors}
@@ -25,12 +25,12 @@ import org.apache.spark.ml.stat.Correlation
  */
 object App {
   // Input file location
-  //val inputFilePath = "./870075876_T_ONTIME_REPORTING.csv"
   val inputFilePath = "./196328912_T_ONTIME_REPORTING.csv"
+
   val forbiddenVariables = Seq("ARR_TIME", "ACTUAL_ELAPSED_TIME", "AIR_TIME", "TAXI_IN", "DIVERTED", "CARRIER_DELAY",
     "WEATHER_DELAY", "NAS_DELAY", "SECURITY_DELAY", "LATE_AIRCRAFT_DELAY")
   val uselessVariables = Seq("OP_CARRIER_FL_NUM","CRS_DEP_TIME","DEP_TIME","TAXI_OUT", "CANCELLATION_CODE","DISTANCE")
-  val correlationUsefulVariables = Array("DEP_DELAY","CRS_ARR_TIME","ARR_DELAY","CRS_ELAPSED_TIME")
+  val correlationUsefulVariables: Array[String] = Array("DEP_DELAY","CRS_ARR_TIME","ARR_DELAY","CRS_ELAPSED_TIME")
   val targetVariable = "ARR_DELAY"
 
   def main(args : Array[String]) {
@@ -53,24 +53,8 @@ object App {
       .drop(uselessVariables:_*)
       // 2.4 Removes no available values.
       .na.drop()
-    // 2.5 Correlation matrix.
-    /*val inputMatrix = new VectorAssembler()
-      .setInputCols(correlationUsefulVariables)
-      .setOutputCol("features")
-      .transform(df)
-    val Row(coeff: Matrix) = Correlation.corr(inputMatrix, "features", "spearman").head
-    println("Spearman correlation matrix :\n" + coeff.toString)
-    // 2.6 Group, order and filter.
-    val dfSorted = df.orderBy(df.col("YEAR").desc, df.col("MONTH").desc, df.col("DAY_OF_MONTH").desc,
-      df.col("DAY_OF_WEEK").desc).filter(df("CANCELLED") === 0)*/
 
-    // 2.7 Creates new variables.
-    //, DELAY_FACTOR, DELAY_CUMULATIVE  〖DELAY_FACTOR 〗_(n+1)  =  〖CRS_ELAPSED_TIME〗_(n+1)/〖CRS_ELAPSED_TIME〗_n
-    /*val dfFinal = df.withColumn("REAL_ARR_TIME", df.col("DEP_DELAY") +
-        df.col("ARR_DELAY") + df.col("CRS_ARR_TIME"))
-      .withColumn("DELAY_FACTOR", Lag("DELAY_FACTOR", 1, null).over(window))*/
-
-    // 2.8 Modeling
+    // 3. Modeling
     // Splits the data into train and test datasets
     val Array(train, test) = df.randomSplit(Array(.8,.2), 42)
 
@@ -78,75 +62,45 @@ object App {
       .setInputCols(correlationUsefulVariables)
       .setOutputCol("features")
 
-    // Modeling:
-    // Instantiate the model and fit the training dataset into the model.
-    val lr = new LinearRegression()
+    // Instantiate the estimators and fit the training dataset into the model.
+    val linearRegression = new LinearRegression()
       .setFeaturesCol("features")
       .setLabelCol(targetVariable)
       .setMaxIter(10)
       .setElasticNetParam(0.8)
 
-    var randomForestRegressor = new RandomForestRegressor()
+    val randomForestRegressor = new RandomForestRegressor()
       .setFeaturesCol("features")
       .setLabelCol(targetVariable)
 
-    /*println(s"Coefficients: ${lrModel.coefficients}")
-    println(s"Intercept: ${lrModel.intercept}")
-    val trainingSummary = lrModel.summary
+    // Create pipelines and execute them to fit the models
+    val linearRegressionPipeline = new Pipeline()
+      .setStages(Array(assembler,linearRegression))
+    val lrModel = linearRegressionPipeline.fit(train)
 
-     println(s"numIterations: ${trainingSummary.totalIterations}")
-     //println(s"objectiveHistory: ${trainingSummary.objectiveHistory.toList}")
-     trainingSummary.residuals.show()
-     println(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
-     println(s"r2: ${trainingSummary.r2}")*/
-
-    // Then user the model on the test data to get the predictions and lastly evaluating the score
-    // of the predictions with the evaluation metric.
-
-    val pipeline = new Pipeline()
-      .setStages(Array(assembler,lr))
-    val lrModel = pipeline.fit(train)
-
-    val pipelineRandomForest = new Pipeline()
+    val randomForestPipeline = new Pipeline()
       .setStages(Array(assembler,randomForestRegressor))
-    val rfModel = pipelineRandomForest.fit(train)
+    val rfModel = randomForestPipeline.fit(train)
 
-    val prediction = lrModel.transform(test)
-    prediction.show(truncate=false)
+    //4. Evaluating
+    // Use the model on the test data to get the predictions
+    val linearRegressionPrediction = lrModel.transform(test)
+    linearRegressionPrediction.show(truncate=false)
 
-    val predictionRandomForest = rfModel.transform(test)
-    predictionRandomForest.show(truncate=false)
+    val randomForestPrediction = rfModel.transform(test)
+    randomForestPrediction.show(truncate=false)
 
-    // 2.9 Evaluating
-    /***
-     * We can use the RegressionEvaluator to obtain the R2, MSE or RMSE. It required two columns,
-     * ARR_DELAY and prediction to evaluate the model.
-     */
-    // 2.9.1 Evaluate model with area under ROC
+    // Define the R2 Regression Evaluator
     val evaluator = new RegressionEvaluator()
       .setLabelCol(targetVariable)
       .setPredictionCol("prediction")
       .setMetricName("r2")
 
-    // 2.9.2 Measure the accuracy of pipeline model
-    val pipelineAccuracy = evaluator.evaluate(prediction)
-    println("The model accuracy is: " + pipelineAccuracy)
+    // Measure the accuracy of each model
+    val pipelineAccuracy = evaluator.evaluate(linearRegressionPrediction)
+    println("The Linear Regression model accuracy is: " + pipelineAccuracy)
 
-    val randomForestAccuracy = evaluator.evaluate(predictionRandomForest)
-    println("The Random Forest model accuracy is: " + randomForestAccuracy)
-
-    /*dfSorted.write
-      .option("header","true")
-      .csv("../spark_output")*/
-
-    // 2.1. Gets a RDD with a list with all columns per line and skips header from csv file
-    /*val rdd = data.map(line => {line.split(",")})
-      // 2.2 Remove forbidden variables:
-      .mapPartitionsWithIndex { (idx, it) => if (idx == 0) it.drop(1) else it }
-
-    rdd.foreach(f=>{
-      println("Col1:"+f(0)+",Col2:"+f(1))
-    })*/
-
+    val randomForestAccuracy = evaluator.evaluate(randomForestPrediction)
+    println("The Random Forest Regression model accuracy is: " + randomForestAccuracy)
   }
 }
