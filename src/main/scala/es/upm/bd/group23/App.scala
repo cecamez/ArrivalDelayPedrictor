@@ -38,7 +38,6 @@ object App {
     // 1. Load the input data, previously stored at a known location.
     val spark = SparkSession
       .builder()
-      //.master("local[1]")
       .appName("Arrival Delay Predictor")
       .getOrCreate();
 
@@ -55,14 +54,15 @@ object App {
       .na.drop()
 
     // 3. Modeling
-    // Splits the data into train and test datasets
+    // 3.1. Splits the data into train and test datasets
     val Array(train, test) = df.randomSplit(Array(.8,.2), 42)
 
+    // 3.2. Create Assembler
     val assembler = new VectorAssembler()
       .setInputCols(correlationUsefulVariables)
       .setOutputCol("features")
 
-    // Instantiate the estimators and fit the training dataset into the model.
+    // 3.3. Instantiate the estimators and fit the training dataset into the model.
     val linearRegression = new LinearRegression()
       .setFeaturesCol("features")
       .setLabelCol(targetVariable)
@@ -73,7 +73,7 @@ object App {
       .setFeaturesCol("features")
       .setLabelCol(targetVariable)
 
-    // Create pipelines and execute them to fit the models
+    // 3.4. Create pipelines and execute them to fit the models
     val linearRegressionPipeline = new Pipeline()
       .setStages(Array(assembler,linearRegression))
     val lrModel = linearRegressionPipeline.fit(train)
@@ -82,21 +82,21 @@ object App {
       .setStages(Array(assembler,randomForestRegressor))
     val rfModel = randomForestPipeline.fit(train)
 
-    //4. Evaluating
-    // Use the model on the test data to get the predictions
+    // 4. Evaluating
+    // 4.1. Use the model on the test data to get the predictions
     val linearRegressionPrediction = lrModel.transform(test)
     linearRegressionPrediction.show(truncate=false)
 
     val randomForestPrediction = rfModel.transform(test)
     randomForestPrediction.show(truncate=false)
 
-    // Define the R2 Regression Evaluator
+    // 4.2. Define the R2 Regression Evaluator
     val evaluator = new RegressionEvaluator()
       .setLabelCol(targetVariable)
       .setPredictionCol("prediction")
       .setMetricName("r2")
 
-    // Measure the accuracy of each model
+    // 4.3. Measure the accuracy of each model
     val pipelineAccuracy = evaluator.evaluate(linearRegressionPrediction)
     println("The Linear Regression model accuracy is: " + pipelineAccuracy)
 
