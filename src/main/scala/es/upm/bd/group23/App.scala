@@ -10,7 +10,7 @@ import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.ml.linalg.{Matrix, Vectors}
-import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.regression.{LinearRegression, RandomForestRegressor}
 import org.apache.spark.mllib.evaluation.RegressionMetrics
 import org.apache.spark.ml.stat.Correlation
 //import org.apache.spark.sql.catalyst.expressions.{Lag, Window}
@@ -25,7 +25,8 @@ import org.apache.spark.ml.stat.Correlation
  */
 object App {
   // Input file location
-  val inputFilePath = "..\\196328912_T_ONTIME_REPORTING.csv"
+  //val inputFilePath = "./870075876_T_ONTIME_REPORTING.csv"
+  val inputFilePath = "./196328912_T_ONTIME_REPORTING.csv"
   val forbiddenVariables = Seq("ARR_TIME", "ACTUAL_ELAPSED_TIME", "AIR_TIME", "TAXI_IN", "DIVERTED", "CARRIER_DELAY",
     "WEATHER_DELAY", "NAS_DELAY", "SECURITY_DELAY", "LATE_AIRCRAFT_DELAY")
   val uselessVariables = Seq("OP_CARRIER_FL_NUM","CRS_DEP_TIME","DEP_TIME","TAXI_OUT", "CANCELLATION_CODE","DISTANCE")
@@ -85,6 +86,10 @@ object App {
       .setMaxIter(10)
       .setElasticNetParam(0.8)
 
+    var randomForestRegressor = new RandomForestRegressor()
+      .setFeaturesCol("features")
+      .setLabelCol(targetVariable)
+
     /*println(s"Coefficients: ${lrModel.coefficients}")
     println(s"Intercept: ${lrModel.intercept}")
     val trainingSummary = lrModel.summary
@@ -102,8 +107,15 @@ object App {
       .setStages(Array(assembler,lr))
     val lrModel = pipeline.fit(train)
 
+    val pipelineRandomForest = new Pipeline()
+      .setStages(Array(assembler,randomForestRegressor))
+    val rfModel = pipelineRandomForest.fit(train)
+
     val prediction = lrModel.transform(test)
     prediction.show(truncate=false)
+
+    val predictionRandomForest = rfModel.transform(test)
+    predictionRandomForest.show(truncate=false)
 
     // 2.9 Evaluating
     /***
@@ -119,6 +131,9 @@ object App {
     // 2.9.2 Measure the accuracy of pipeline model
     val pipelineAccuracy = evaluator.evaluate(prediction)
     println("The model accuracy is: " + pipelineAccuracy)
+
+    val randomForestAccuracy = evaluator.evaluate(predictionRandomForest)
+    println("The Random Forest model accuracy is: " + randomForestAccuracy)
 
     /*dfSorted.write
       .option("header","true")
